@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="MiniLedger.Api/MiniLedger.Api.csproj" />
+  <Project Path="MiniLedger.Tests/MiniLedger.Tests.csproj" />
+</Solution>
