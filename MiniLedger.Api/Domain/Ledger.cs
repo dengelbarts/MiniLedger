@@ -5,29 +5,91 @@ public class Ledger
     private readonly Dictionary<Guid, Account> _accounts = new();
     private readonly List<Transaction> _transactions = new();
     private readonly Dictionary<string, Transaction> _byIdempotencyKey = new();
+    private readonly object _gate = new();
 
     public Account Open(string owner, decimal initialDeposit = 0)
     {
-        if (initialDeposit < 0)
+        lock(_gate)
         {
-            throw new LedgerException(LedgerError.InvalidAmount, "Initial deposit cannot be negative");
+            if (initialDeposit < 0)
+            {
+                throw new LedgerException(LedgerError.InvalidAmount, "Initial deposit cannot be negative");
+            }
+            Account account = new(owner);
+            if (initialDeposit > 0)
+            {
+                account.Credit(initialDeposit);
+            }
+            _accounts.Add(account.Id, account);
+            return account;
         }
-        Account account = new(owner);
-        if (initialDeposit > 0)
-        {
-            account.Credit(initialDeposit);
-        }
-        _accounts.Add(account.Id, account);
-        return account;
     }
 
     public Account Get(Guid id)
     {
-        if (!_accounts.TryGetValue(id, out var account))
+        lock(_gate)
         {
-            throw new LedgerException(LedgerError.NotFound, $"Account {id} not found");
+            if (!_accounts.TryGetValue(id, out var account))
+            {
+                throw new LedgerException(LedgerError.NotFound, $"Account {id} not found");
+            }
+            return account;
         }
-        return account;
+    }
+
+    public Transaction Transfer(Guid from, Guid to, decimal amount, string idempotencyKey)
+    {
+        lock (_gate)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(idempotencyKey);
+            if (amount <= 0)
+            {
+                throw new LedgerException(LedgerError.InvalidAmount, "Transfer amount must be positive");
+            }
+            if (from == to)
+            {
+                throw new LedgerException(LedgerError.SameAccount, "Cannot transfer to the same account");
+            }
+            if (!_accounts.TryGetValue(from, out var fromAccount))
+            {
+                throw new LedgerException(LedgerError.NotFound, $"Account {from} not found");
+            }
+            if (!_accounts.TryGetValue(to, out var toAccount))
+            {
+                throw new LedgerException(LedgerError.NotFound, $"Account {to} not found");
+            }
+            if (_byIdempotencyKey.TryGetValue(idempotencyKey, out var existingTransaction))
+            {
+                return existingTransaction;
+            }
+            if (fromAccount.Balance < amount)
+            {
+                throw new LedgerException(LedgerError.InsufficientFunds, "Insufficient funds for transfer");
+            }
+
+            fromAccount.Debit(amount);
+            toAccount.Credit(amount);
+            var transaction = new Transaction(Guid.NewGuid(), from, to, amount, DateTimeOffset.UtcNow, idempotencyKey);
+            _transactions.Add(transaction);
+            _byIdempotencyKey.Add(idempotencyKey, transaction);
+            return transaction;
+        }
+    }
+
+    public IReadOnlyList<Transaction> GetTransactions(Guid accountId)
+    {
+        lock (_gate)
+        {
+            var result = new List<Transaction>();
+            foreach (var transaction in _transactions)
+            {
+                if (transaction.From == accountId || transaction.To == accountId)
+                {
+                    result.Add(transaction);
+                }
+            }
+            return result;
+        }
     }
 }
 
