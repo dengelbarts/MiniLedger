@@ -84,14 +84,9 @@ public class Ledger
     {
         lock (_gate)
         {
-            var result = new List<Transaction>();
-            foreach (var transaction in _transactions)
-            {
-                if (transaction.From == accountId || transaction.To == accountId)
-                {
-                    result.Add(transaction);
-                }
-            }
+            var result = _transactions
+                .Where(t => t.From == accountId || t.To == accountId)
+                .ToList();
             return result;
         }
     }
