@@ -1,6 +1,6 @@
 namespace MiniLedger.Api.Domain;
 
-public enum LedgerError { InvalidAmount, SameAccount, NotFound, InsufficientFunds }
+public enum LedgerError { InvalidAmount, SameAccount, NotFound, InsufficientFunds, IdempotencyConflict }
 
 public class LedgerException : Exception
 {

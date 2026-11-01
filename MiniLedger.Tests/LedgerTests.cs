@@ -112,4 +112,18 @@ public class LedgerTests
 
         Assert.Equal(2, aliceTransactions.Count);
     }
+
+    [Fact]
+    public void Transfer_SameKeyDifferentDetails_Throws()
+    {
+        var ledger = new Ledger();
+        var alice = ledger.Open("Alice", 100m);
+        var bob = ledger.Open("Bob");
+
+        ledger.Transfer(alice.Id, bob.Id, 30m, "key-1");
+
+        var ex = Assert.Throws<LedgerException>(() => ledger.Transfer(alice.Id, bob.Id, 40m, "key-1"));
+
+        Assert.Equal(LedgerError.IdempotencyConflict, ex.Error);
+    }
 }

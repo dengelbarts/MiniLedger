@@ -60,6 +60,10 @@ public class Ledger
             }
             if (_byIdempotencyKey.TryGetValue(idempotencyKey, out var existingTransaction))
             {
+                if (existingTransaction.From != from || existingTransaction.To != to || existingTransaction.Amount != amount)
+                {
+                    throw new LedgerException(LedgerError.IdempotencyConflict, "Idempotency key conflict: transaction details do not match");
+                }
                 return existingTransaction;
             }
             if (fromAccount.Balance < amount)

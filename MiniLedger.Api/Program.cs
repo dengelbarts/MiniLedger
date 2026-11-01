@@ -18,6 +18,7 @@ app.Use(async (context, next) =>
             LedgerError.SameAccount => StatusCodes.Status400BadRequest,
             LedgerError.NotFound => StatusCodes.Status404NotFound,
             LedgerError.InsufficientFunds => StatusCodes.Status409Conflict,
+            LedgerError.IdempotencyConflict => StatusCodes.Status409Conflict,
             _ => StatusCodes.Status500InternalServerError
         };
         await Results.Problem(detail: ex.Message, statusCode: status).ExecuteAsync(context);
@@ -35,6 +36,13 @@ app.MapPost("/accounts", (OpenAccountRequest request, Ledger ledger) =>
     return Results.Created($"/accounts/{account.Id}", account);
 });
 
+app.MapPost("/transfers", (TransferRequest request, Ledger ledger) =>
+{
+    var transaction = ledger.Transfer(request.FromAccountId, request.ToAccountId, request.Amount, request.IdempotencyKey);
+    return Results.Ok(transaction);
+});
+
 app.Run();
 
 record OpenAccountRequest(string Owner, decimal InitialDeposit);
+record TransferRequest(Guid FromAccountId, Guid ToAccountId, decimal Amount, string IdempotencyKey);
